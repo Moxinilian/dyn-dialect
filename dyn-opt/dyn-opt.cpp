@@ -43,7 +43,7 @@ class ComplexTypeWrapper : public ConcreteTypeWrapper<ComplexType> {
   size_t getParameterAmount() override { return 1; }
 
   Type instanciate(llvm::function_ref<InFlightDiagnostic()> emitError,
-                             ArrayRef<Attribute> parameters) override {
+                   ArrayRef<Attribute> parameters) override {
     if (parameters.size() != this->getParameterAmount()) {
       emitError().append("invalid number of type parameters ",
                          parameters.size(), " (expected ",
@@ -51,7 +51,8 @@ class ComplexTypeWrapper : public ConcreteTypeWrapper<ComplexType> {
       return Type();
     }
 
-    return ComplexType::getChecked(emitError, parameters[0].cast<TypeAttr>().getType());
+    return ComplexType::getChecked(emitError,
+                                   parameters[0].cast<TypeAttr>().getType());
   }
 };
 

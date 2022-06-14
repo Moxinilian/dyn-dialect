@@ -30,8 +30,8 @@
 using namespace mlir;
 using namespace irdl;
 using mlir::irdlssa::IRDLSSADialect;
-using mlir::irdlssa::TypeContext;
 using mlir::irdlssa::ParamTypeAttrOrAnyAttr;
+using mlir::irdlssa::TypeContext;
 using mlir::irdlssa::TypeWrapper;
 
 namespace mlir {
@@ -81,7 +81,7 @@ mlir::Value EqTypeConstraintAttr::registerAsSSA(
   irdlssa::SSA_IsType op = rewriter.create<irdlssa::SSA_IsType>(
       location, rewriter.getType<irdlssa::ConstraintType>(),
       ParamTypeAttrOrAnyAttr::get(rewriter.getContext(),
-                               TypeAttr::get(this->getType())));
+                                  TypeAttr::get(this->getType())));
   return op.getResult();
 }
 

@@ -88,7 +88,7 @@ SSA_IsType::getVerifier(SmallVector<Value> const &valueToConstr) {
 
   if (!attr)
     return {};
-  
+
   if (TypeAttr type = attr.dyn_cast<TypeAttr>()) {
     return {std::make_unique<IsTypeConstraint>(type.getValue())};
   } else {

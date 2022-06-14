@@ -79,7 +79,8 @@ Attribute ParamTypeAttrOrAnyAttr::parse(AsmParser &odsParser, Type odsType) {
 }
 
 void ParamTypeAttrOrAnyAttr::print(AsmPrinter &odsPrinter) const {
-  if (ParamTypeInstanceAttr attr = this->getAttr().dyn_cast<ParamTypeInstanceAttr>()) {
+  if (ParamTypeInstanceAttr attr =
+          this->getAttr().dyn_cast<ParamTypeInstanceAttr>()) {
     attr.print(odsPrinter);
   } else {
     odsPrinter << this->getAttr();
