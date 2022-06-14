@@ -242,8 +242,8 @@ def IRDL_SSA_IsType : IRDL_SSA_ConstraintOp<"is_type", [ParentOneOf<["SSA_TypeOp
 
     `irdlssa.is_type` also accepts completely instanciated parametric types,
     such as `std.complex<f32>`. It does not however allow expressing asbtract
-    types, such as `std.complex<T>` where `T` is a type variable. See
-    `irdlssa.parametric_type` for this use case.
+    types, such as `std.complex<T>` where `T` is a type constraint. See
+    `irdlssa.parametric_type` instead for this use case.
 
     Example:
 
