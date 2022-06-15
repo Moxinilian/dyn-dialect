@@ -1,4 +1,5 @@
 add_mlir_dialect_library(MLIRIRDLSSA
+        Analysis/Domain.cpp
         IR/IRDLSSA.cpp
         IR/IRDLSSAAttributes.cpp
         IR/IRDLSSAOps.cpp
@@ -17,4 +18,3 @@ add_mlir_dialect_library(MLIRIRDLSSA
   LINK_LIBS PUBLIC
   MLIRIR
   )
-
