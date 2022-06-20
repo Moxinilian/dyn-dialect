@@ -42,7 +42,6 @@ TypeWrapper *findTypeWrapper(MLIRContext &ctx, StringRef type) {
   return irdlssa->getTypeWrapper(type);
 }
 
-// Verifier instantiation
 Attribute
 instanciateParamType(llvm::function_ref<InFlightDiagnostic()> emitError,
                      MLIRContext &ctx, ParamTypeAttrOrAnyAttr attr) {
@@ -81,6 +80,8 @@ instanciateParamType(llvm::function_ref<InFlightDiagnostic()> emitError,
   }
 }
 
+// IsType constraint
+
 llvm::Optional<std::unique_ptr<TypeConstraint>>
 SSA_IsType::getVerifier(SmallVector<Value> const &valueToConstr) {
   auto attr = instanciateParamType([&]() { return this->emitError(); },
@@ -96,6 +97,32 @@ SSA_IsType::getVerifier(SmallVector<Value> const &valueToConstr) {
     return {};
   }
 }
+
+ConstraintDomain getDomainOf(ParamTypeAttrOrAnyAttr attr) {
+  ConstraintDomain domain;
+
+  if (ParamTypeInstanceAttr paramType =
+          attr.getAttr().dyn_cast<ParamTypeInstanceAttr>()) {
+    std::vector<ConstraintDomain> paramDomains;
+    for (ParamTypeAttrOrAnyAttr param : paramType.getParams()) {
+      paramDomains.push_back(std::move(getDomainOf(param)));
+    }
+    domain.insert(paramType.getBase(), std::move(paramDomains));
+  } else if (TypeAttr type = attr.getAttr().dyn_cast<TypeAttr>()) {
+    domain.insert(type.getValue());
+  } else {
+    assert(0 && "non-type type parameters are currently not supported");
+  }
+
+  return std::move(domain);
+}
+
+ConstraintDomain
+SSA_IsType::abstract(ArrayRef<ConstraintDomain> const &domains) {
+  return std::move(getDomainOf(this->type()));
+}
+
+// ParametricType constraint
 
 llvm::Optional<std::unique_ptr<TypeConstraint>>
 SSA_ParametricType::getVerifier(SmallVector<Value> const &valueToConstr) {
@@ -125,6 +152,19 @@ SSA_ParametricType::getVerifier(SmallVector<Value> const &valueToConstr) {
   }
 }
 
+ConstraintDomain
+SSA_ParametricType::abstract(ArrayRef<ConstraintDomain> const &domains) {
+  ConstraintDomain domain;
+  std::vector<ConstraintDomain> paramDomains(domains.size());
+  for (auto &opDomain : domains) {
+    paramDomains.push_back(opDomain);
+  }
+  domain.insert(this->type(), std::move(paramDomains));
+  return std::move(domain);
+}
+
+// AnyOf constraint
+
 llvm::Optional<std::unique_ptr<TypeConstraint>>
 SSA_AnyOf::getVerifier(SmallVector<Value> const &valueToConstr) {
   SmallVector<size_t> constraints;
@@ -140,7 +180,38 @@ SSA_AnyOf::getVerifier(SmallVector<Value> const &valueToConstr) {
   return {std::make_unique<AnyOfTypeConstraint>(constraints)};
 }
 
+ConstraintDomain
+SSA_AnyOf::abstract(ArrayRef<ConstraintDomain> const &domains) {
+  assert(domains.size() > 0 &&
+         "any_of should have at least one constraint parameter");
+
+  ConstraintDomain newDomain = domains[0];
+  for (auto &domain : domains.slice(1)) {
+    ConstraintDomain building;
+
+    for (World const &world1 : newDomain.worlds) {
+      for (World const &world2 : domain.worlds) {
+        Optional<World> inter = world1.intersect(world2);
+        if (inter.hasValue()) {
+          World worldPick1 = *inter;
+          worldPick1.insert()
+          building.worlds.insert()
+        }
+      }
+    }
+
+    std::swap(newDomain, building);
+  }
+}
+
+// AnyType constraint
+
 llvm::Optional<std::unique_ptr<TypeConstraint>>
 SSA_AnyType::getVerifier(SmallVector<Value> const &valueToConstr) {
   return {std::make_unique<AnyTypeConstraint>()};
+}
+
+ConstraintDomain
+SSA_AnyType::abstract(ArrayRef<ConstraintDomain> const &domains) {
+  return std::move(ConstraintDomain::oneWorld(World::unconstrained()));
 }

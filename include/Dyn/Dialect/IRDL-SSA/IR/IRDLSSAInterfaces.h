@@ -13,6 +13,7 @@
 #ifndef DYN_DIALECT_IRDL_SSA_IR_IRDLSSAINTERFACES_H_
 #define DYN_DIALECT_IRDL_SSA_IR_IRDLSSAINTERFACES_H_
 
+#include "Dyn/Dialect/IRDL-SSA/Analysis/Domain.h"
 #include "Dyn/Dialect/IRDL-SSA/IRDLSSAVerifiers.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"

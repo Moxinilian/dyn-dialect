@@ -218,7 +218,8 @@ def IRDL_SSA_OperationOp : IRDL_SSA_Op<"operation",
 //===----------------------------------------------------------------------===//
 
 class IRDL_SSA_ConstraintOp<string mnemonic, list<Trait> traits = []>
-    : IRDL_SSA_Op<mnemonic, [VerifyConstraintInterface, DeclareOpInterfaceMethods<VerifyConstraintInterface>] # traits> {
+    : IRDL_SSA_Op<mnemonic, [VerifyConstraintInterface, DeclareOpInterfaceMethods<VerifyConstraintInterface>,
+                             AbstractOperationInterface, DeclareOpInterfaceMethods<AbstractOperationInterface>] # traits> {
 }
 
 def IRDL_SSA_IsType : IRDL_SSA_ConstraintOp<"is_type", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp"]>, NoSideEffect]> {

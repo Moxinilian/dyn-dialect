@@ -1,4 +1,4 @@
-//===- Domain.h - IRDL-SSA domain analyss -----------------------*- C++ -*-===//
+//===- Domain.h - IRDL-SSA domain analysis ----------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,35 +13,38 @@
 using namespace mlir;
 using namespace irdlssa;
 
-ConstraintDomain ConstraintDomain::empty() {
-  return std::move(ConstraintDomain());
+TypeSet TypeSet::empty() { return std::move(TypeSet()); }
+
+TypeSet TypeSet::any() {
+  TypeSet set;
+  set.isAny = true;
+  return std::move(set);
 }
 
-ConstraintDomain ConstraintDomain::any() {
-  ConstraintDomain domain;
-  domain.isAny = true;
-  return std::move(domain);
-}
-
-void ConstraintDomain::insert(StringRef base,
-                              std::vector<ConstraintDomain> params) {
+void TypeSet::insert(StringRef base, std::vector<TypeSet> params) {
   if (!this->isAny)
     this->parametricTypes.insert({base, std::move(params)});
 }
 
-void ConstraintDomain::insert(Type type) {
+void TypeSet::insert(Type type) {
   if (!this->isAny)
     this->builtinTypes.insert(type);
 }
 
-void ConstraintDomain::join(ConstraintDomain const &other) {
+TypeSet TypeSet::join(TypeSet const &other) const {
   if (this->isAny || other.isAny) {
-    this->isAny = true;
-    return;
+    return std::move(TypeSet::any());
+  }
+
+  llvm::StringMap<std::vector<TypeSet>> newParametricTypes;
+  llvm::SmallPtrSet<Type, 4> newBuiltinTypes;
+
+  for (Type t : this->builtinTypes) {
+    newBuiltinTypes.insert(t);
   }
 
   for (Type t : other.builtinTypes) {
-    this->builtinTypes.insert(t);
+    newBuiltinTypes.insert(t);
   }
 
   for (auto &entry : other.parametricTypes) {
@@ -51,58 +54,61 @@ void ConstraintDomain::join(ConstraintDomain const &other) {
       auto &paramsOther = entry.second;
       assert(params.size() == paramsOther.size() &&
              "inconsistent amount of type parameters");
+      std::vector<TypeSet> newParamTypes(params.size());
       for (size_t i = 0; i < params.size(); i++) {
-        params[i].join(paramsOther[i]);
+        newParamTypes.push_back(std::move(params[i].join(paramsOther[i])));
       }
+      newParametricTypes.insert({entry.getKey(), std::move(newParamTypes)});
     } else {
-      this->parametricTypes.insert({entry.getKey(), entry.getValue()});
+      newParametricTypes.insert({entry.getKey(), entry.getValue()});
     }
   }
+
+  for (auto &entry : this->parametricTypes) {
+    if (newParametricTypes.count(entry.getKey()) == 0) {
+      newParametricTypes.insert({entry.getKey(), entry.getValue()});
+    }
+  }
+
+  return std::move(TypeSet(newParametricTypes, newBuiltinTypes));
 }
 
-void ConstraintDomain::intersect(ConstraintDomain const &other) {
+TypeSet TypeSet::intersect(TypeSet const &other) const {
   if (other.isAny)
-    return;
+    return *this;
 
   if (this->isAny) {
-    ConstraintDomain otherCopy = other;
-    std::swap(*this, otherCopy);
-    return;
+    return other;
   }
 
-  SmallVector<Type> builtinOutsideIntersection;
+  llvm::StringMap<std::vector<TypeSet>> newParametricTypes;
+  llvm::SmallPtrSet<Type, 4> newBuiltinTypes;
+
   for (Type t : this->builtinTypes) {
-    if (!other.builtinTypes.contains(t)) {
-      builtinOutsideIntersection.push_back(t);
+    if (other.builtinTypes.count(t) > 0) {
+      newBuiltinTypes.insert(t);
     }
   }
 
-  for (Type t : builtinOutsideIntersection) {
-    this->builtinTypes.erase(t);
-  }
-
-  SmallVector<StringRef> parametricOutsideIntersection;
   for (auto &entry : this->parametricTypes) {
     auto parametricTypeIt = other.parametricTypes.find(entry.getKey());
-    if (parametricTypeIt == this->parametricTypes.end()) {
-      parametricOutsideIntersection.push_back(entry.getKey());
-    } else {
+    if (parametricTypeIt != this->parametricTypes.end()) {
       auto &params = entry.second;
       auto &paramsOther = parametricTypeIt->second;
       assert(params.size() == paramsOther.size() &&
              "inconsistent amount of type parameters");
+      std::vector<TypeSet> newParamTypes(params.size());
       for (size_t i = 0; i < params.size(); i++) {
-        params[i].intersect(paramsOther[i]);
+        newParamTypes.push_back(std::move(params[i].intersect(paramsOther[i])));
       }
+      newParametricTypes.insert({entry.getKey(), std::move(newParamTypes)});
     }
   }
 
-  for (StringRef t : parametricOutsideIntersection) {
-    this->parametricTypes.erase(t);
-  }
+  return std::move(TypeSet(newParametricTypes, newBuiltinTypes));
 }
 
-bool ConstraintDomain::subsetOf(ConstraintDomain const &other) const {
+bool TypeSet::subsetOf(TypeSet const &other) const {
   if (other.isAny)
     return true;
 
@@ -135,24 +141,85 @@ bool ConstraintDomain::subsetOf(ConstraintDomain const &other) const {
   return true;
 }
 
-Optional<size_t> ConstraintDomain::size() const {
+bool TypeSet::isEmpty() const {
+  if (this->isAny || this->builtinTypes.size() > 0)
+    return false;
+
+  for (auto &paramType : this->parametricTypes) {
+    if (paramType.getValue().size() == 0) {
+      // If the type has no parameters, then the base
+      // alone testifies of a recognized type.
+      return false;
+    }
+
+    for (TypeSet const &paramSet : paramType.getValue()) {
+      if (!paramSet.isEmpty())
+        return false;
+    }
+  }
+
+  return true;
+}
+
+Optional<size_t> TypeSet::size() const {
   if (this->isAny)
     return llvm::None;
 
   size_t size = this->builtinTypes.size();
-  
+
   for (auto &entry : this->parametricTypes) {
-    size_t productDomainSize = 1;
+    size_t productTypeSetSize = 1;
     for (auto &param : entry.getValue()) {
       Optional<size_t> paramSize = param.size();
       if (paramSize.hasValue()) {
-        productDomainSize *= *paramSize;
+        productTypeSetSize *= *paramSize;
       } else {
         return llvm::None;
       }
     }
-    size += productDomainSize;
+    size += productTypeSetSize;
   }
 
   return size;
+}
+
+World World::unconstrained() {
+  return World();
+}
+
+void World::insert(Value val, TypeSet types) {
+  this->typeSets.insert({val, std::move(types)});
+}
+
+Optional<World> World::intersect(World const &other) const {
+  World world;
+
+  for (auto &entry : this->typeSets) {
+    auto otherSetIt = other.typeSets.find(entry.getFirst());
+    if (otherSetIt != this->typeSets.end()) {
+      auto &typeSet = entry.second;
+      auto &otherTypeSet = otherSetIt->second;
+      TypeSet result = typeSet.intersect(otherTypeSet);
+      if (result.isEmpty()) {
+        return llvm::None;
+      }
+      world.insert(entry.getFirst(), std::move(result));
+    } else {
+      world.insert(entry.getFirst(), entry.getSecond());
+    }
+  }
+
+  for (auto &entry : other.typeSets) {
+    if (world.typeSets.count(entry.getFirst()) == 0) {
+      world.insert(entry.getFirst(), entry.getSecond());
+    }
+  }
+
+  return std::move(world);
+}
+
+ConstraintDomain ConstraintDomain::oneWorld(World world) {
+  ConstraintDomain domain;
+  domain.worlds.insert(world);
+  return std::move(domain);
 }

@@ -31,4 +31,20 @@ def VerifyConstraintInterface : OpInterface<"VerifyConstraintInterface"> {
   ];
 }
 
+def AbstractOperationInterface : OpInterface<"AbstractOperationInterface"> {
+  let cppNamespace = "::mlir::irdlssa";
+
+  let description = [{
+    Represents the abstract interpretation function of an operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      "Computes the output domain of the instruction given the domain of its input.",
+      "mlir::irdlssa::ConstraintDomain", "abstract",
+      (ins "mlir::ArrayRef<mlir::irdlssa::ConstraintDomain> const&":$domains)
+    >
+  ];
+}
+
 #endif // DYN_DIALECT_IRDL_SSA_IR_IRDLSSAINTERFACES

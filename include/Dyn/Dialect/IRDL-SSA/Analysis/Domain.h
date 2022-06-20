@@ -15,6 +15,7 @@
 
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Types.h"
+#include "mlir/Pass/AnalysisManager.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -23,46 +24,66 @@
 namespace mlir {
 namespace irdlssa {
 
-class ConstraintDomain {
-  // TODO: This is not really the most efficient memory layout.
+// TODO: Make this more efficient
+
+class TypeSet {
   bool isAny = false;
-  llvm::StringMap<std::vector<ConstraintDomain>> parametricTypes;
+  llvm::StringMap<std::vector<TypeSet>> parametricTypes;
   llvm::SmallPtrSet<Type, 4> builtinTypes;
 
+  TypeSet(llvm::StringMap<std::vector<TypeSet>> parametricTypes,
+          llvm::SmallPtrSet<Type, 4> builtinTypes)
+      : parametricTypes(parametricTypes), builtinTypes(builtinTypes) {}
 
 public:
   /// Constructs an empty domain.
-  ConstraintDomain() {}
+  TypeSet() {}
 
-  static ConstraintDomain empty();
-  static ConstraintDomain any();
+  static TypeSet empty();
+  static TypeSet any();
 
-  void insert(StringRef base, std::vector<ConstraintDomain> params);
+  void insert(StringRef base, std::vector<TypeSet> params);
   void insert(Type type);
 
-  /// Adds to the current domain all types
-  /// in the `other` domain.
-  void join(ConstraintDomain const &other);
+  /// Creates a type set containing all the types
+  /// for the current set and the `other` set.
+  TypeSet join(TypeSet const &other) const;
 
-  /// Removes from the current domain all types
-  /// that are not in the `other` domain.
-  void intersect(ConstraintDomain const &other);
+  /// Creates a type set containing the types that
+  /// are both in the current set and the `other` set.
+  TypeSet intersect(TypeSet const &other) const;
 
-  /// Determines if the current domain is a subset
-  /// of the provided `other` domain, that is that all
-  /// types within this domain are also within the
-  /// `other` domain.
-  bool subsetOf(ConstraintDomain const &other) const;
+  /// Determines if the current type set is a subset
+  /// of the provided `other` type set, that is that all
+  /// types within this type set are also within the
+  /// `other` type set.
+  bool subsetOf(TypeSet const &other) const;
 
-  /// Returns the amount of different concrete types this domain
+  bool isEmpty() const;
+
+  /// Returns the amount of different concrete types this type set
   /// contains. No size means it contains an infinite amount.
   Optional<size_t> size() const;
 };
 
-struct DomainAnalysis {
-  ConstraintDomain domain;
+class World {
+  llvm::DenseMap<Value, TypeSet> typeSets;
 
-  DomainAnalysis(Operation *op);
+public:
+  static World unconstrained();
+
+  void insert(Value val, TypeSet types);
+
+  /// Intersects two worlds together to represent the values
+  /// that are common to the two. Returns None if no such
+  /// cases exist.
+  Optional<World> intersect(World const &other) const;
+};
+
+struct ConstraintDomain {
+  llvm::DenseSet<World> worlds;
+
+  static ConstraintDomain oneWorld(World world);
 };
 
 } // namespace irdlssa
