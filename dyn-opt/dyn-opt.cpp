@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Dyn/Dialect/IRDL-Eval/IR/IRDLEval.h"
 #include "Dyn/Dialect/IRDL-SSA/IR/IRDLSSA.h"
 #include "Dyn/Dialect/IRDL/IR/IRDL.h"
+#include "GenEval.h"
 #include "LowerIRDL.h"
 #include "MlirOptMain.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -32,6 +34,7 @@
 using namespace mlir;
 using namespace irdl;
 using namespace irdlssa;
+using namespace irdleval;
 
 class ComplexTypeWrapper : public ConcreteTypeWrapper<ComplexType> {
   StringRef getName() override { return "std.complex"; }
@@ -62,6 +65,8 @@ int main(int argc, char **argv) {
   MLIRContext ctx;
   ctx.getOrLoadDialect<irdl::IRDLDialect>();
   auto irdlssa = ctx.getOrLoadDialect<irdlssa::IRDLSSADialect>();
+  ctx.getOrLoadDialect<irdleval::IRDLEvalDialect>();
+  ctx.getOrLoadDialect<mlir::cf::ControlFlowDialect>();
 
   irdlssa->addTypeWrapper<ComplexTypeWrapper>();
 
@@ -71,6 +76,10 @@ int main(int argc, char **argv) {
       [tyCtx{std::move(tyCtx)}]() -> std::unique_ptr<::mlir::Pass> {
         return std::make_unique<LowerIRDL>(tyCtx);
       });
+
+  mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
+    return std::make_unique<GenEval>();
+  });
 
   // Register all dialects
   DialectRegistry registry;
