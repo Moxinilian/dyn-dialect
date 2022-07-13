@@ -24,6 +24,7 @@ class IRDL_SSA_Op<string mnemonic, list<Trait> traits = []>
 }
 
 class AtMostOneChildOf<string op> : ParamNativeOpTrait<"AtMostOneChildOf", op>;
+class ExactlyOneChildOf<string op> : ParamNativeOpTrait<"ExactlyOneChildOf", op>;
 
 //===----------------------------------------------------------------------===//
 // IRDL-SSA Dialect definition
@@ -221,7 +222,7 @@ class IRDL_SSA_ConstraintOp<string mnemonic, list<Trait> traits = []>
     : IRDL_SSA_Op<mnemonic, [VerifyConstraintInterface, DeclareOpInterfaceMethods<VerifyConstraintInterface>] # traits> {
 }
 
-def IRDL_SSA_IsType : IRDL_SSA_ConstraintOp<"is_type", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp"]>, NoSideEffect]> {
+def IRDL_SSA_IsType : IRDL_SSA_ConstraintOp<"is_type", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp", "SSA_ConstraintProcedureOp"]>, NoSideEffect]> {
   let summary = "Constraints to a specific type";
   let description = [{
     `irdlssa.is_type` defines a constraint that only accepts a specific type.
@@ -267,7 +268,7 @@ def IRDL_SSA_IsType : IRDL_SSA_ConstraintOp<"is_type", [ParentOneOf<["SSA_TypeOp
   let assemblyFormat = [{ `:` $type attr-dict }];
 }
 
-def IRDL_SSA_ParametricType : IRDL_SSA_ConstraintOp<"parametric_type", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp"]>, NoSideEffect]> {
+def IRDL_SSA_ParametricType : IRDL_SSA_ConstraintOp<"parametric_type", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp", "SSA_ConstraintProcedureOp"]>, NoSideEffect]> {
   let summary = "Constraints to a specific instanciated type";
   let description = [{
     `irdlssa.parametric_type` defines a constraint that accepts either a type defined
@@ -298,7 +299,7 @@ def IRDL_SSA_ParametricType : IRDL_SSA_ConstraintOp<"parametric_type", [ParentOn
   let assemblyFormat = [{ `:` $type (`<` $args^ `>`)? attr-dict }];
 }
 
-def IRDL_SSA_AnyType : IRDL_SSA_ConstraintOp<"any_type", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp"]>]> {
+def IRDL_SSA_AnyType : IRDL_SSA_ConstraintOp<"any_type", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp", "SSA_ConstraintProcedureOp"]>]> {
   let summary = "Constraints to any type";
   let description = [{
     `irdlssa.any_type` defines a constraint that accepts any type.
@@ -322,7 +323,7 @@ def IRDL_SSA_AnyType : IRDL_SSA_ConstraintOp<"any_type", [ParentOneOf<["SSA_Type
   let assemblyFormat = [{ attr-dict }];
 }
 
-def IRDL_SSA_AnyOf : IRDL_SSA_ConstraintOp<"any_of", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp"]>]> {
+def IRDL_SSA_AnyOf : IRDL_SSA_ConstraintOp<"any_of", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp", "SSA_ConstraintProcedureOp"]>]> {
   let summary = "Constraints to any of the provided types";
   let description = [{
     `irdlssa.any_of` defines a constraint that accepts any type that
@@ -350,6 +351,44 @@ def IRDL_SSA_AnyOf : IRDL_SSA_ConstraintOp<"any_of", [ParentOneOf<["SSA_TypeOp",
   let arguments = (ins Variadic<IRDL_SSA_ConstraintType>:$args);
   let results = (outs IRDL_SSA_ConstraintType:$output);
   let assemblyFormat = [{ `(` $args `)` attr-dict }];
+}
+
+//===----------------------------------------------------------------------===//
+// IRDL-SSA Variadic operations
+//===----------------------------------------------------------------------===//
+
+def IRDL_SSA_Variadic : IRDL_SSA_ConstraintOp<"variadic", [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp", "SSA_ConstraintProcedureOp"]>]> {
+  let summary = "Constraints to a variadic amount of types satisfying a procedure";
+  let description = [{
+    TODO
+  }];
+
+  let arguments = (ins IRDL_SSA_ConstraintProcedureType:$procedure);
+  let results = (outs IRDL_SSA_ConstraintType:$output);
+  let assemblyFormat = [{ `(` $procedure `)` attr-dict }];
+}
+
+def IRDL_SSA_ConstraintProcedureOp : IRDL_SSA_Op<"constraint_procedure",
+        [ParentOneOf<["SSA_TypeOp", "SSA_OperationOp", "SSA_ConstraintProcedureOp"]>,
+         ExactlyOneChildOf<"SSA_Satisfies">]> {
+  let summary = "Defines a constraint procedure";
+  let description = [{
+    TODO
+  }];
+
+  let regions = (region SizedRegion<1>:$body);
+  let results = (outs IRDL_SSA_ConstraintProcedureType:$output);
+  let assemblyFormat = [{ attr-dict custom<SingleBlockRegion>($body) }];
+}
+
+def IRDL_SSA_Satisfies : IRDL_SSA_Op<"satisfies", [HasParent<"SSA_ConstraintProcedureOp">]> {
+  let summary = "Defines which constraint the procedure must satisfy";
+  let description = [{
+    TODO
+  }];
+
+  let arguments = (ins IRDL_SSA_ConstraintType:$target);
+  let assemblyFormat = [{ `(` $target `)` attr-dict }];
 }
 
 #endif // DYN_DIALECT_IRDL_SSA_IR_IRDLSSAOPS

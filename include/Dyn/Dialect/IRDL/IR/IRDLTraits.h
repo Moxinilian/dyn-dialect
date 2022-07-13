@@ -67,6 +67,51 @@ public:
     }
   };
 };
+
+/// This class adds the property that there is exactly one child of a given op
+/// in the operation region. It also provides an API to retrieve the operation.
+template <typename... ChildOp> class ExactlyOneChildOf {
+public:
+  template <typename ConcreteType>
+  class Impl
+      : public ::mlir::OpTrait::TraitBase<ConcreteType,
+                                          ExactlyOneChildOf<ChildOp...>::Impl> {
+  private:
+    template <typename ChildOpT>
+    static bool hasExactlyOneChildOf(Operation *op) {
+      auto ops = cast<ConcreteType>(op).template getOps<ChildOpT>();
+      return !ops.empty() && ++ops.begin() == ops.end();
+    }
+
+  public:
+    static LogicalResult verifyTrait(Operation *op) {
+      static_assert(
+          ConcreteType::template hasTrait<::mlir::OpTrait::OneRegion>(),
+          "expected operation to have a single region");
+
+      auto satisfiedOps = {hasExactlyOneChildOf<ChildOp>(op)...};
+      for (auto satisfiedOp : satisfiedOps) {
+        if (!satisfiedOp) {
+          // TODO: Write a proper error message here.
+          op->emitError("Error in ExactlyOneChildOf trait.");
+          return failure();
+        }
+      }
+      return success();
+    }
+
+    /// Get the unique operation of a specific op that is in the operation
+    /// region.
+    template <typename OpT>
+    std::enable_if_t<llvm::disjunction<std::is_same<OpT, ChildOp>...>::value,
+                     OpT>
+    getOp() {
+      auto ops =
+          cast<ConcreteType>(this->getOperation()).template getOps<OpT>();
+      return {*ops.begin()};
+    }
+  };
+};
 } // namespace OpTrait
 } // namespace mlir
 

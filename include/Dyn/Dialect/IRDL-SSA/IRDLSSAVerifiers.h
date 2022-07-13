@@ -107,6 +107,13 @@ public:
              ConstraintVerifier &context) const override;
 };
 
+class VariadicConstraint : public TypeConstraint {
+public:
+  LogicalResult
+  verifyType(Optional<function_ref<InFlightDiagnostic()>> emitError, Type type,
+             ConstraintVerifier &context) const override;
+};
+
 } // namespace irdlssa
 } // namespace mlir
 

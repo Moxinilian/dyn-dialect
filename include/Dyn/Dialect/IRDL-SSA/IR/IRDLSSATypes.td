@@ -44,4 +44,11 @@ def IRDL_SSA_ConstraintType : IRDL_SSA_Type<"Constraint", "constr"> {
   }];
 }
 
+def IRDL_SSA_ConstraintProcedureType : IRDL_SSA_Type<"ConstraintProcedure", "constr_proc"> {
+  let summary = "Type representing a constraint procedure";
+  let description = [{
+    TODO
+  }];
+}
+
 #endif // DYN_DIALECT_IRDL_SSA_IR_IRDLSSATYPES
